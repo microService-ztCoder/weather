@@ -1,8 +1,13 @@
 package com.ztCoder.microservice.weather.service.impl;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -13,10 +18,16 @@ import com.ztCoder.microservice.weather.vo.WeatherResponse;
 
 @Service
 public class WeatherDataServiceImpl implements WeatherDataService {
+	private final static Logger logger=LoggerFactory.getLogger(WeatherDataServiceImpl.class);
+	
 	private static final String WEATHER_URI="http://wthrcdn.etouch.cn/weather_mini?";
+	
+	private static final long TIME_OUT=1800L;//常用是1800s
 	
 	@Autowired
 	private RestTemplate restTemplate;
+	@Autowired
+	private StringRedisTemplate stringRedisTemplate;
 	
 	@Override
 	public WeatherResponse getDataByCityId(String cityId) {
@@ -35,18 +46,32 @@ public class WeatherDataServiceImpl implements WeatherDataService {
 	private WeatherResponse doGetWeather(String uri){
 		WeatherResponse weather=null;
 		ObjectMapper mapper=new ObjectMapper();
-		ResponseEntity<String> respString=restTemplate.getForEntity(uri, String.class);
-		
 		String strBody=null;
-		if(respString.getStatusCodeValue()==200){
-			strBody=respString.getBody();
+		
+		ValueOperations<String, String> ops=stringRedisTemplate.opsForValue();
+		//先查缓存，缓存有的取缓存中的数据
+		if(stringRedisTemplate.hasKey(uri)){
+			logger.info("Redis has data");
+			strBody=ops.get(uri);
+		}else{
+			ResponseEntity<String> respString=restTemplate.getForEntity(uri, String.class);
+			
+			if(respString.getStatusCodeValue()==200){
+				strBody=respString.getBody();
+			}
+			logger.info("Redis  don`t has data");
+			
+			//数据写入缓存
+			ops.set(uri, strBody,TIME_OUT,TimeUnit.SECONDS);
 		}
+		
 		try {
 			weather=mapper.readValue(strBody, WeatherResponse.class);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			logger.error("Error!",e);
 		}
+		
 		return weather;
 	}
 

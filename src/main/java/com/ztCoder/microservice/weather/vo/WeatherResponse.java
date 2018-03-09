@@ -13,16 +13,16 @@ public class WeatherResponse implements Serializable {
    * 
    */
   private static final long serialVersionUID = 1L;
-  private Weather weather;
+  private Weather data;
   private Integer status;
   private String desc;
 
   public Weather getWeather() {
-    return weather;
+    return data;
   }
 
   public void setWeather(Weather weather) {
-    this.weather = weather;
+    this.data = weather;
   }
 
   public Integer getStatus() {
